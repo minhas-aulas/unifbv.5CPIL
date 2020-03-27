@@ -4,10 +4,11 @@ module HOPPER-SYNTAX
 
     syntax Skip ::= "Skip"
 
-    syntax Block ::= "{" Stmt "}"
+    syntax Block ::= "{" Stmt "}" | Stmt
 
     syntax Stmt ::= "if" "(" BExp ")" Block [strict(1)]
                 | "if" "(" BExp ")" Block ElseIfStmt [strict(1)]
+                | BExp "?" Block ":" Block [strict(1)]
                 | AExp
 
     syntax ElseIfStmt ::= "elif" "(" BExp ")" Block
@@ -17,6 +18,7 @@ module HOPPER-SYNTAX
     syntax BExp ::= Bool
                     | Int "<" Int
                     | Int ">" Int 
+                    | "(" BExp ")" [bracket]
 
     syntax AExp ::= Int
                 | Int "+" Int
@@ -30,6 +32,9 @@ module HOPPER-SYNTAX
     rule elif ( B:BExp ) { S1:Stmt } S2:ElseIfStmt => if ( B ) { S1 } S2
     rule elif ( B:BExp ) { S:Stmt } => if ( B ) { S }
     rule else { S } => S
+
+    rule true ? B:Block : _ => B 
+    rule false ? _ : B:Block => B
 
     rule I1:Int + I2:Int => I1 +Int I2
     rule I1:Int < I2:Int => I1 <Int I2
