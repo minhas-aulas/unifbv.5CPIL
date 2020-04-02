@@ -8,7 +8,7 @@
 - Use `krun file_name.hopper` to run your program;
 
 ## Docker
-- Use `docker run -it your_current_working_directory/:/workspace fabiosantos/kframework bash` to create and run the K container; 
+- Use `docker run -it -v your_current_working_directory/:/workspace fabiosantos/kframework bash` to create and run the K container; 
 
 
 
