@@ -1,1 +1,7 @@
-(5 > 2) ? 2 : 3
+program { 
+    integer count = 1;
+    integer y = 2;
+    integer z = 3;
+    count++
+    z = y + count + z;
+} 
