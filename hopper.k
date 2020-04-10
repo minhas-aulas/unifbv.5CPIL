@@ -6,36 +6,43 @@ module HOPPER-SYNTAX
 
     syntax Block ::= "{" Stmt "}" 
                 | Stmt
-                | Stmt Block
 
     syntax Stmt ::= "if" "(" BExp ")" Block [strict(1)]
                 | "if" "(" BExp ")" Block ElseIfStmt [strict(1)]
                 | BExp "?" Block ":" Block [strict(1)]
-                | "while" "(" BExp ")" Block [strict(1)]
+                | "while" "(" BExp ")" Block
+                | "do" Block "while" "(" BExp ")"
+                | "for" "(" Type UniqueIdAssigner ";" BExp ";" AExpMod ")" Block
                 | AExp
                 | DecVar ";"
                 | Assigner
-                | Exp
+                | AExpMod
+                | Stmt Stmt [left]
 
     syntax Type ::= "integer" | "boolean"
 
-    syntax DecVar ::= Type Id
+    syntax Ids ::= List{Id, ","}
+    
+    syntax DecVar ::= Type Ids
+
+    syntax UniqueIdAssigner ::= Id "=" AExp  [strict(2)]
 
     syntax Assigner ::= DecVar "=" AExp ";" [strict(2)]
-                    | Id "=" AExp ";" [strict(2)]
+                    |  UniqueIdAssigner ";"
 
     syntax ElseIfStmt ::= "elif" "(" BExp ")" Block
                         | "else" Block
                         | "elif" "(" BExp ")" Block ElseIfStmt
 
     syntax BExp ::= Bool
-                    | Int "<" Int
-                    | Int "<" Id
-                    | Int ">" Int 
+                    | AExp "<" AExp [strict]
+                    | AExp "<=" AExp [strict]
+                    | AExp ">" AExp [strict]
+                    | AExp ">=" AExp [strict]
                     | "(" BExp ")" [bracket]
 
 
-    syntax Exp ::= Id "++" 
+    syntax AExpMod ::= Id "++" 
 
     syntax AExp ::= Int
                 | Id
@@ -43,7 +50,7 @@ module HOPPER-SYNTAX
 
     rule program { B:Block } => B [structural]
 
-    rule S:Stmt B:Block => S ~> B
+    rule S1:Stmt S2:Stmt => S1 ~> S2
     
     rule Skip => .
     
@@ -58,6 +65,13 @@ module HOPPER-SYNTAX
     rule true ? B:Block : _ => B 
     rule false ? _ : B:Block => B
 
+    rule while (B:BExp) { S:Stmt } => if(B){ S while (B) { S } } [structural]
+    
+    rule do { S:Stmt } while (B:BExp) => S ~> if(B){ do { S } while (B) } [structural]
+    
+    rule for (T:Type I:Id = V:AExp ; B:BExp ; Amod:AExpMod ) {S} 
+        => T I = V ; ~> while (B) { S Amod } [structural]
+        
     rule I1:Int + I2:Int => I1 +Int I2
     rule I1:Int < I2:Int => I1 <Int I2
     rule I1:Int > I2:Int => I1 >Int I2
@@ -66,6 +80,19 @@ module HOPPER-SYNTAX
         <env> MEnv:Map => MEnv I |-> L </env>
         <store> MStore:Map => MStore L |-> 0 </store>
         <loc> L:Int => L +Int 1 </loc>
+                    
+    rule <k> T:Type (I:Id, Xs:Ids) ; => T Xs ; ... </k>
+        <env> MEnv:Map => MEnv I |-> L </env>
+        <store> MStore:Map => MStore L |-> 0 </store>
+        <loc> L:Int => L +Int 1 </loc>
+
+    rule <k> T:Type (I:Id, Xs:Ids) = V:Int ; => T Xs = V ; ... </k>
+        <env> MEnv:Map => MEnv I |-> L </env>
+        <store> MStore:Map => MStore L |-> V </store>
+        <loc> L:Int => L +Int 1 </loc>
+
+    rule T:Type .Ids ; => Skip  
+    rule T:Type .Ids = _:Int ; => Skip  
 
     rule <k> integer I:Id = V:Int ; => Skip ... </k>
         <env> MEnv:Map => MEnv I |-> L </env>
@@ -85,7 +112,7 @@ module HOPPER-SYNTAX
         <store> ... L |-> (V => V +Int 1) ... </store>
 
 
-    configuration <T> 
+    configuration <T>
         <k> $PGM:Pgm </k>
         <env> .Map </env>
         <store> .Map </store>

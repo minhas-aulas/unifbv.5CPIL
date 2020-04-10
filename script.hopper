@@ -1,7 +1,7 @@
 program { 
-    integer count = 1;
-    integer y = 2;
-    integer z = 3;
-    count++
-    z = y + count + z;
+    integer x = 50;
+    
+    for( integer i = 0 ; 50 > i ; i++ ) {
+        x++
+    }
 } 
