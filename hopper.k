@@ -13,12 +13,19 @@ module HOPPER-SYNTAX
                 | "while" "(" BExp ")" Block
                 | "do" Block "while" "(" BExp ")"
                 | "for" "(" Type UniqueIdAssigner ";" BExp ";" AExpMod ")" Block
+                | Foreach
                 | AExp
                 | DecVar ";"
                 | Assigner
                 | AExpMod
+                | Skip
                 | Stmt Stmt [left]
 
+
+    syntax ListValues ::= List{Int, ","}
+    syntax ArrayList ::= "[" ListValues "]"
+    syntax Foreach ::= "foreach" "(" Id "in" ArrayList ")" Block
+    
     syntax Type ::= "integer" | "boolean"
 
     syntax Ids ::= List{Id, ","}
@@ -28,7 +35,7 @@ module HOPPER-SYNTAX
     syntax UniqueIdAssigner ::= Id "=" AExp  [strict(2)]
 
     syntax Assigner ::= DecVar "=" AExp ";" [strict(2)]
-                    |  UniqueIdAssigner ";"
+                    |  UniqueIdAssigner
 
     syntax ElseIfStmt ::= "elif" "(" BExp ")" Block
                         | "else" Block
@@ -43,10 +50,15 @@ module HOPPER-SYNTAX
 
 
     syntax AExpMod ::= Id "++" 
-
     syntax AExp ::= Int
                 | Id
-                | AExp "+" AExp [seqstrict, left]
+                > left: AExp "*" AExp [seqstrict]
+                > left: AExp "/" AExp [seqstrict]
+                | AExp "-" AExp [seqstrict]
+                | AExp "+" AExp [seqstrict]
+                | "(" AExp ")" [bracket]
+                
+                
 
     rule program { B:Block } => B [structural]
 
@@ -71,9 +83,33 @@ module HOPPER-SYNTAX
     
     rule for (T:Type I:Id = V:AExp ; B:BExp ; Amod:AExpMod ) {S} 
         => T I = V ; ~> while (B) { S Amod } [structural]
+
+    rule <k>
+            foreach (I:Id in [ (V:Int, Vs:ListValues) ] ) { S:Stmt }
+            => S ~> foreach (I in [ Vs:ListValues ] ) { S }
+            ... 
+        </k>
+        <env> MEnv:Map => MEnv I |-> L </env>
+        <store> MStore:Map => MStore L |-> V </store>
+        <loc> L:Int => L +Int 1 </loc>
+        when notBool (I in keys(MEnv))
+
+    rule <k>
+            foreach (I:Id in [ (V:Int, Vs:ListValues) ] ) { S:Stmt }
+            => S ~> foreach (I in [ Vs:ListValues ] ) { S }
+            ... 
+        </k>
+        <env> ... I |-> L ... </env>
+        <store> ... L |-> (_ => V) ... </store>
+
+    rule foreach (I:Id in [ .ListValues ] ) B:Block => Skip
         
     rule I1:Int + I2:Int => I1 +Int I2
+    rule I1:Int - I2:Int => I1 -Int I2
+    rule I1:Int * I2:Int => I1 *Int I2
+    rule I1:Int / I2:Int => I1 /Int I2
     rule I1:Int < I2:Int => I1 <Int I2
+    rule I1:Int <= I2:Int => I1 <=Int I2
     rule I1:Int > I2:Int => I1 >Int I2
 
     rule <k> T:Type I:Id ; => Skip ... </k>
@@ -99,9 +135,13 @@ module HOPPER-SYNTAX
         <store> MStore:Map => MStore L |-> V </store>
         <loc> L:Int => L +Int 1 </loc>
 
-    rule <k> I:Id = V:Int ; => Skip ... </k>
+    rule <k> I:Id = V:Int => Skip ... </k>
         <env> ... I |-> L ... </env>
         <store> ... L |-> (_ => V) ... </store>
+
+    rule <k> I1:Id = I2:Id => I1 = V ... </k>
+        <env> ... I2 |-> L ... </env>
+        <store> ... L |-> V  ... </store>
 
     rule <k> I:Id => V ... </k>
         <env> ... I |-> L ... </env>
