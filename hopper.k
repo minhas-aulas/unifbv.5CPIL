@@ -1,5 +1,6 @@
 module HOPPER-SYNTAX 
     import DOMAINS
+
     syntax Pgm ::= "program" "{" Block "}"      
 
     syntax Skip ::= "Skip"
@@ -16,11 +17,19 @@ module HOPPER-SYNTAX
                 | Foreach
                 | AExp
                 | DecVar ";"
+                | FuncDec
+                | FuncCall ";"
                 | Assigner
                 | AExpMod
                 | Skip
                 | Stmt Stmt [left]
 
+
+    syntax Params ::= List{Id, ","}
+    syntax FuncDec ::= "function" Id "(" Params ")" Block
+    syntax Values ::= List{Int, ","}
+    syntax FuncCall ::= Id "(" Values ")"
+    syntax Local ::= "local" "(" Id "," Stmt ")"
 
     syntax ListValues ::= List{Int, ","}
     syntax ArrayList ::= "[" ListValues "]"
@@ -61,8 +70,9 @@ module HOPPER-SYNTAX
                 
 
     rule program { B:Block } => B [structural]
-
-    rule S1:Stmt S2:Stmt => S1 ~> S2
+ 
+    rule S1:Stmt S2:Stmt => S1 ~> S2 [structural]
+    rule local(I:Id, S1:Stmt S2:Stmt) => local(I, S1) ~> local(I, S2) [structural]
     
     rule Skip => .
     
@@ -151,9 +161,60 @@ module HOPPER-SYNTAX
         <env> ... I |-> L ... </env>
         <store> ... L |-> (V => V +Int 1) ... </store>
 
+    rule <k> function I:Id (P:Params) { S:Stmt } => Skip ... </k>
+        ( .Bag => <thread> 
+                <id> I </id>
+                <scope> S </scope>
+                <params> P </params>
+                <temp> P </temp>
+                <localEnv> .Map </localEnv>
+            </thread>
+        )
+
+    rule <k> I:Id (.Values) ; => local(I, S) ... </k>
+        <thread>
+            ...
+            <id> I </id>
+            <scope> S:Stmt </scope>
+            <params> P </params> 
+            <temp> (.Params => P) </temp> 
+            ...
+        </thread>
+    
+    rule <k> I:Id ((V:Int, Vs:Values)) ; => I:Id (Vs) ; ... </k>
+        <thread>
+            ...
+            <id> I </id>
+            <temp> ((P:Id, Ps:Params) => Ps)  </temp>
+            <localEnv> Rho:Map => Rho P |-> L </localEnv>
+            ...
+        </thread>
+        <store> SMap:Map => SMap L |-> V </store>
+        <loc> L => L +Int 1 </loc>
+        
+    rule <k> local(FuncId:Id, integer I:Id = V:Int ;) => Skip ... </k>
+        <thread>
+            ...
+            <id> FuncId </id>
+            <localEnv> Rho:Map => Rho I |-> L </localEnv>
+            ...
+        </thread>
+        <store> SMap:Map => SMap L |-> V </store>
+        <loc> L => L +Int 1 </loc>
+
+
 
     configuration <T>
         <k> $PGM:Pgm </k>
+        <functions color="orange"> 
+            <thread multiplicity="*" color="blue" type="Map"> 
+                <id> .K </id>
+                <scope> .K </scope>
+                <params> .K </params>
+                <temp> .K </temp>
+                <localEnv> .Map </localEnv>
+            </thread> 
+        </functions>
         <env> .Map </env>
         <store> .Map </store>
         <loc> 1 </loc>
